@@ -1,0 +1,4 @@
+- Her zaman modern, temiz ve modüler kod yaz.
+- Python projelerinde 'type hinting' (örn: -> None, : str) kullan.
+- Hata yönetimi için her zaman try-except blokları kullan.
+- Kodun karmaşıklığını düşük tut, 'Single Responsibility Principle'a (SRP) sadık kal.
