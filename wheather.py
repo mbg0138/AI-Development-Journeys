@@ -19,6 +19,16 @@ USER_FRIENDLY_ERROR_MSG = "Bir hata oluştu, detaylar app.log dosyasında."
 logger = logging.getLogger(__name__)
 
 
+def is_cloud_runtime() -> bool:
+    return bool(os.getenv("RENDER") or os.getenv("RAILWAY_ENVIRONMENT"))
+
+
+def get_user_error_message() -> str:
+    if is_cloud_runtime():
+        return "Bir hata oluştu, detaylar sunucu loglarında."
+    return USER_FRIENDLY_ERROR_MSG
+
+
 def setup_logging() -> None:
     if logger.handlers:
         return
@@ -28,19 +38,26 @@ def setup_logging() -> None:
         "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-    file_handler = RotatingFileHandler(
-        LOG_FILE,
-        maxBytes=LOG_MAX_BYTES,
-        backupCount=LOG_BACKUP_COUNT,
-        encoding="utf-8",
-    )
-    file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+
+    if is_cloud_runtime():
+        stream_handler = logging.StreamHandler()
+        stream_handler.setLevel(logging.INFO)
+        stream_handler.setFormatter(formatter)
+        logger.addHandler(stream_handler)
+    else:
+        file_handler = RotatingFileHandler(
+            LOG_FILE,
+            maxBytes=LOG_MAX_BYTES,
+            backupCount=LOG_BACKUP_COUNT,
+            encoding="utf-8",
+        )
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
 
 
 def report_user_error() -> None:
-    print(USER_FRIENDLY_ERROR_MSG)
+    print(get_user_error_message())
 
 
 setup_logging()
@@ -231,25 +248,6 @@ class WeatherService:
         return location, temperature
 
 if __name__ == "__main__":
-    try:
-        lat = float(input("Enlem (latitude) giriniz: "))
-        lon = float(input("Boylam (longitude) giriniz: "))
-        service = WeatherService()
-        location, temp = service.get_current_temperature(lat, lon)
-        if temp is not None:
-            print(f"Konum: {location}")
-            print(f"Anlık sıcaklık: {temp}°C")
-        else:
-            logger.error(
-                "Temperature unavailable in CLI: lat=%s lon=%s location=%s",
-                lat,
-                lon,
-                location,
-            )
-            report_user_error()
-    except ValueError:
-        logger.error("Invalid coordinate input from user")
-        print("Geçerli bir sayı giriniz.")
-    except requests.RequestException as exc:
-        logger.error("Unhandled API error in CLI: %s", exc)
-        report_user_error()
+    print("Koordinatlar artık tarayıcı/API üzerinden gönderilir.")
+    print("Web servisini başlatın: python main.py")
+    print("Örnek: http://127.0.0.1:5000/weather?lat=41.0082&lon=28.9784")

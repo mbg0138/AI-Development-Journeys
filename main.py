@@ -2,8 +2,8 @@ import requests
 from flask import Flask, jsonify, request
 
 from wheather import (
-    USER_FRIENDLY_ERROR_MSG,
     WeatherService,
+    get_user_error_message,
     load_app_settings,
     load_config_from_env,
     logger,
@@ -17,17 +17,29 @@ weather_service = WeatherService(config=load_config_from_env())
 def _parse_coordinates() -> tuple[float, float]:
     lat_raw = request.args.get("lat")
     lon_raw = request.args.get("lon")
+    if lat_raw is None or lon_raw is None:
+        raise ValueError(
+            "lat ve lon query parametreleri zorunludur. "
+            "Örnek: /weather?lat=41.0082&lon=28.9784"
+        )
     try:
-        latitude = float(lat_raw) if lat_raw is not None else app_settings.latitude
-        longitude = float(lon_raw) if lon_raw is not None else app_settings.longitude
+        return float(lat_raw), float(lon_raw)
     except (TypeError, ValueError) as exc:
-        raise ValueError("lat and lon must be valid numbers") from exc
-    return latitude, longitude
+        raise ValueError("lat ve lon geçerli sayılar olmalıdır") from exc
 
 
 @app.get("/")
-def health() -> tuple[dict[str, str], int]:
-    return jsonify({"status": "ok", "service": "weather"}), 200
+def index() -> tuple[dict, int]:
+    return (
+        jsonify(
+            {
+                "service": "weather",
+                "usage": "/weather?lat=<latitude>&lon=<longitude>",
+                "example": "/weather?lat=41.0082&lon=28.9784",
+            }
+        ),
+        200,
+    )
 
 
 @app.get("/weather")
@@ -49,7 +61,7 @@ def get_weather() -> tuple[dict, int]:
             longitude,
             exc,
         )
-        return jsonify({"error": USER_FRIENDLY_ERROR_MSG}), 502
+        return jsonify({"error": get_user_error_message()}), 502
 
     if temperature is None:
         logger.error(
@@ -58,7 +70,7 @@ def get_weather() -> tuple[dict, int]:
             longitude,
             location,
         )
-        return jsonify({"error": USER_FRIENDLY_ERROR_MSG}), 502
+        return jsonify({"error": get_user_error_message()}), 502
 
     return (
         jsonify(

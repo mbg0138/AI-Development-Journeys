@@ -26,7 +26,7 @@
 1. Push repo to GitHub.
 2. **New → Web Service** (or Blueprint with [render.yaml](render.yaml)).
 3. **Build Command:** `pip install -r requirements.txt`
-4. **Start Command:** `gunicorn main:app --bind 0.0.0.0:$PORT`
+4. **Start Command:** `gunicorn main:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120`
 5. **Environment** → add `API_KEY` as secret (if needed).
 6. Test: `https://<your-app>.onrender.com/weather?lat=41.0082&lon=28.9784`
 

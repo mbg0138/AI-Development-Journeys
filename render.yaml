@@ -2,9 +2,13 @@ services:
   - type: web
     name: weather-api
     runtime: python
+    plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn main:app --bind 0.0.0.0:$PORT
+    startCommand: gunicorn main:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+    healthCheckPath: /
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
       - key: WEATHER_LATITUDE
         value: "41.0082"
       - key: WEATHER_LONGITUDE
@@ -16,6 +20,6 @@ services:
       - key: GEOCODING_API_URL
         value: "https://nominatim.openstreetmap.org/reverse"
       - key: REQUEST_TIMEOUT
-        value: "10.0"
+        value: "30"
       - key: API_KEY
         sync: false
