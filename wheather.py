@@ -6,7 +6,13 @@ from pathlib import Path
 from typing import Any
 
 import requests
-LOG_FILE = Path(__file__).resolve().parent / "app.log"
+from dotenv import load_dotenv
+
+_PROJECT_DIR = Path(__file__).resolve().parent
+_ENV_FILE = _PROJECT_DIR / ".env"
+load_dotenv(_ENV_FILE)
+
+LOG_FILE = _PROJECT_DIR / "app.log"
 LOG_MAX_BYTES = 1 * 1024 * 1024  # 1 MB
 LOG_BACKUP_COUNT = 5
 USER_FRIENDLY_ERROR_MSG = "Bir hata oluştu, detaylar app.log dosyasında."
@@ -40,32 +46,64 @@ def report_user_error() -> None:
 setup_logging()
 
 
-DEFAULT_WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
-DEFAULT_GEOCODING_URL = "https://nominatim.openstreetmap.org/reverse"
-DEFAULT_USER_AGENT = "bobo-test-weather/1.0"
-DEFAULT_TIMEOUT = 10.0
+# Fallback defaults (mirror .env.example; overridden by environment / .env)
+_FALLBACK_WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
+_FALLBACK_GEOCODING_URL = "https://nominatim.openstreetmap.org/reverse"
+_FALLBACK_USER_AGENT = "bobo-test-weather/1.0"
+_FALLBACK_TIMEOUT = "10.0"
+_FALLBACK_LATITUDE = "41.0082"
+_FALLBACK_LONGITUDE = "28.9784"
+_FALLBACK_PORT = "5000"
+
+
+@dataclass(frozen=True)
+class AppSettings:
+    latitude: float
+    longitude: float
+    port: int
 
 
 @dataclass(frozen=True)
 class ApiConfig:
-    weather_url: str = DEFAULT_WEATHER_URL
-    geocoding_url: str = DEFAULT_GEOCODING_URL
-    user_agent: str = DEFAULT_USER_AGENT
-    timeout: float = DEFAULT_TIMEOUT
+    weather_url: str = _FALLBACK_WEATHER_URL
+    geocoding_url: str = _FALLBACK_GEOCODING_URL
+    user_agent: str = _FALLBACK_USER_AGENT
+    timeout: float = 10.0
     api_key: str | None = None
 
 
-def load_config_from_env() -> ApiConfig:
-    timeout_raw = os.getenv("REQUEST_TIMEOUT", str(DEFAULT_TIMEOUT))
-    api_key = os.environ.get("API_KEY")
-    return ApiConfig(
-        weather_url=os.getenv("WEATHER_API_URL", DEFAULT_WEATHER_URL),
-        geocoding_url=os.getenv("GEOCODING_API_URL", DEFAULT_GEOCODING_URL),
-        user_agent=os.getenv("NOMINATIM_USER_AGENT", DEFAULT_USER_AGENT),
-        timeout=float(timeout_raw),
-        api_key=api_key if api_key else None,
+def _env_str(name: str, fallback: str) -> str:
+    value = os.getenv(name)
+    return fallback if value is None or value.strip() == "" else value.strip()
+
+
+def _env_float(name: str, fallback: str) -> float:
+    return float(_env_str(name, fallback))
+
+
+def load_app_settings() -> AppSettings:
+    return AppSettings(
+        latitude=_env_float("WEATHER_LATITUDE", _FALLBACK_LATITUDE),
+        longitude=_env_float("WEATHER_LONGITUDE", _FALLBACK_LONGITUDE),
+        port=int(_env_str("PORT", _FALLBACK_PORT)),
     )
 
+
+def load_config_from_env() -> ApiConfig:
+    api_key = _env_str("API_KEY", "")
+    user_agent = _env_str("NOMINATIM_USER_AGENT", _FALLBACK_USER_AGENT)
+    if user_agent == _FALLBACK_USER_AGENT:
+        logger.warning(
+            "NOMINATIM_USER_AGENT is not set; using fallback. "
+            "Set it in .env (see .env.example)."
+        )
+    return ApiConfig(
+        weather_url=_env_str("WEATHER_API_URL", _FALLBACK_WEATHER_URL),
+        geocoding_url=_env_str("GEOCODING_API_URL", _FALLBACK_GEOCODING_URL),
+        user_agent=user_agent,
+        timeout=_env_float("REQUEST_TIMEOUT", _FALLBACK_TIMEOUT),
+        api_key=api_key or None,
+    )
 
 def extract_temperature(data: dict[str, Any]) -> float | None:
     return data.get("current_weather", {}).get("temperature")

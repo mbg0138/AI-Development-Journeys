@@ -1,30 +1,25 @@
-import os
-
 import requests
 from flask import Flask, jsonify, request
 
 from wheather import (
     USER_FRIENDLY_ERROR_MSG,
     WeatherService,
+    load_app_settings,
     load_config_from_env,
     logger,
 )
 
-DEFAULT_LATITUDE = 41.0082
-DEFAULT_LONGITUDE = 28.9784
-
+app_settings = load_app_settings()
 app = Flask(__name__)
 weather_service = WeatherService(config=load_config_from_env())
 
 
 def _parse_coordinates() -> tuple[float, float]:
+    lat_raw = request.args.get("lat")
+    lon_raw = request.args.get("lon")
     try:
-        latitude = float(
-            request.args.get("lat", os.getenv("WEATHER_LATITUDE", DEFAULT_LATITUDE))
-        )
-        longitude = float(
-            request.args.get("lon", os.getenv("WEATHER_LONGITUDE", DEFAULT_LONGITUDE))
-        )
+        latitude = float(lat_raw) if lat_raw is not None else app_settings.latitude
+        longitude = float(lon_raw) if lon_raw is not None else app_settings.longitude
     except (TypeError, ValueError) as exc:
         raise ValueError("lat and lon must be valid numbers") from exc
     return latitude, longitude
@@ -79,5 +74,4 @@ def get_weather() -> tuple[dict, int]:
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "5000"))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=app_settings.port)

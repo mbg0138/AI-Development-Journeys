@@ -27,6 +27,8 @@ def api_config() -> ApiConfig:
     return ApiConfig(
         weather_url="https://test.example/forecast",
         geocoding_url="https://test.example/reverse",
+        user_agent="test-weather/1.0",
+        timeout=10.0,
     )
 
 

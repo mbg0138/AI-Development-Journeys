@@ -11,5 +11,11 @@ services:
         value: "28.9784"
       - key: NOMINATIM_USER_AGENT
         value: "your-app-name/1.0 (contact@example.com)"
+      - key: WEATHER_API_URL
+        value: "https://api.open-meteo.com/v1/forecast"
+      - key: GEOCODING_API_URL
+        value: "https://nominatim.openstreetmap.org/reverse"
+      - key: REQUEST_TIMEOUT
+        value: "10.0"
       - key: API_KEY
         sync: false
