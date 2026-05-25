@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: weather-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn main:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: WEATHER_LATITUDE
+        value: "41.0082"
+      - key: WEATHER_LONGITUDE
+        value: "28.9784"
+      - key: NOMINATIM_USER_AGENT
+        value: "your-app-name/1.0 (contact@example.com)"
+      - key: API_KEY
+        sync: false

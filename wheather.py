@@ -1,14 +1,15 @@
 import logging
+import os
 from dataclasses import dataclass
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
 
 import requests
-
 LOG_FILE = Path(__file__).resolve().parent / "app.log"
 LOG_MAX_BYTES = 1 * 1024 * 1024  # 1 MB
 LOG_BACKUP_COUNT = 5
+USER_FRIENDLY_ERROR_MSG = "Bir hata oluştu, detaylar app.log dosyasında."
 logger = logging.getLogger(__name__)
 
 
@@ -16,6 +17,7 @@ def setup_logging() -> None:
     if logger.handlers:
         return
     logger.setLevel(logging.INFO)
+    logger.propagate = False
     formatter = logging.Formatter(
         "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
@@ -31,13 +33,38 @@ def setup_logging() -> None:
     logger.addHandler(file_handler)
 
 
+def report_user_error() -> None:
+    print(USER_FRIENDLY_ERROR_MSG)
+
+
 setup_logging()
+
+
+DEFAULT_WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
+DEFAULT_GEOCODING_URL = "https://nominatim.openstreetmap.org/reverse"
+DEFAULT_USER_AGENT = "bobo-test-weather/1.0"
+DEFAULT_TIMEOUT = 10.0
+
+
 @dataclass(frozen=True)
 class ApiConfig:
-    weather_url: str = "https://api.open-meteo.com/v1/forecast"
-    geocoding_url: str = "https://nominatim.openstreetmap.org/reverse"
-    user_agent: str = "bobo-test-weather/1.0"
-    timeout: float = 10.0
+    weather_url: str = DEFAULT_WEATHER_URL
+    geocoding_url: str = DEFAULT_GEOCODING_URL
+    user_agent: str = DEFAULT_USER_AGENT
+    timeout: float = DEFAULT_TIMEOUT
+    api_key: str | None = None
+
+
+def load_config_from_env() -> ApiConfig:
+    timeout_raw = os.getenv("REQUEST_TIMEOUT", str(DEFAULT_TIMEOUT))
+    api_key = os.environ.get("API_KEY")
+    return ApiConfig(
+        weather_url=os.getenv("WEATHER_API_URL", DEFAULT_WEATHER_URL),
+        geocoding_url=os.getenv("GEOCODING_API_URL", DEFAULT_GEOCODING_URL),
+        user_agent=os.getenv("NOMINATIM_USER_AGENT", DEFAULT_USER_AGENT),
+        timeout=float(timeout_raw),
+        api_key=api_key if api_key else None,
+    )
 
 
 def extract_temperature(data: dict[str, Any]) -> float | None:
@@ -70,15 +97,17 @@ class WeatherService:
         config: ApiConfig | None = None,
         session: requests.Session | None = None,
     ) -> None:
-        self._config = config or ApiConfig()
+        self._config = config or load_config_from_env()
         self._session = session or requests.Session()
 
     def fetch_weather(self, latitude: float, longitude: float) -> dict[str, Any]:
-        params = {
+        params: dict[str, Any] = {
             "latitude": latitude,
             "longitude": longitude,
             "current_weather": "true",
         }
+        if self._config.api_key:
+            params["apikey"] = self._config.api_key
         logger.info(
             "Weather API request: url=%s params=%s",
             self._config.weather_url,
@@ -173,10 +202,16 @@ if __name__ == "__main__":
             print(f"Konum: {location}")
             print(f"Anlık sıcaklık: {temp}°C")
         else:
-            print("Sıcaklık bilgisi alınamadı.")
+            logger.error(
+                "Temperature unavailable in CLI: lat=%s lon=%s location=%s",
+                lat,
+                lon,
+                location,
+            )
+            report_user_error()
     except ValueError:
         logger.error("Invalid coordinate input from user")
         print("Geçerli bir sayı giriniz.")
-    except requests.RequestException as e:
-        logger.error("Unhandled API error in CLI: %s", e)
-        print(f"API isteği sırasında hata oluştu: {e}")
+    except requests.RequestException as exc:
+        logger.error("Unhandled API error in CLI: %s", exc)
+        report_user_error()
